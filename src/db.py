@@ -24,7 +24,7 @@ async def get_block_query(user_id: int) -> str:
         return result[0] if result else ''
 
 
-async def set_block_query(user_id: int, block_query: str) -> None:
+async def set_block_query(user_id: int, block_query: str | None = None) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             'INSERT OR REPLACE INTO users (user_id, block_query) VALUES (?, ?)',

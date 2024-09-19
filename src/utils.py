@@ -1,11 +1,13 @@
 import asyncio
+import re
 
 import aiohttp
 import booru
 import msgspec
-from vkbottle import PhotoMessageUploader
+from loguru import logger
+from vkbottle import PhotoMessageUploader, VKAPIError
 
-from config import DEFAULT_BLOCK
+from config import DEFAULT_BLOCK, INTERNAL_BAN_WORDS
 from db import get_block_query
 
 
@@ -50,8 +52,8 @@ async def vk_booru_search(
         posts_count = 3
         query = parameters
 
-    if posts_count > 5:
-        return "5 posts max"
+    if posts_count > 8:
+        return "8 posts max"
 
     block_query = await get_block_query(from_id)
     posts_all = await booru.search(query, block_query, 100)
@@ -59,12 +61,27 @@ async def vk_booru_search(
 
     photos = []
     for post in posts:
+        if post.get("rating") in ("explicit", "questionable") and 'loli' in post['tags']:
+            continue
+
         post_url = post.get('large_file_url') or post.get('sample_url') or post.get('file_url')
         image_bytes = await get_url_image(post_url)
-        photo = await uploader.upload(image_bytes, peer_id=from_id)
+        try:
+            photo = await uploader.upload(image_bytes, peer_id=from_id)
+        except VKAPIError as e:
+            logger.error(f"Couldn't upload photo: {e}")
+            continue
         photos.append(photo)
 
     return photos
+
+
+def bad_words_in_text(text: str) -> bool:
+    text: str = re.sub(r'\.(?=[^\s])', '. ', text)
+    for ban_word in INTERNAL_BAN_WORDS:
+        if ban_word in text:
+            return True
+    return False
 
 
 async def main():
