@@ -3,6 +3,7 @@ import asyncio
 import aiohttp
 import booru
 import msgspec
+import random
 
 from config import DEFAULT_BLOCK
 
@@ -23,6 +24,27 @@ async def get_url_image(url: str) -> bytes:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             return await resp.read()
+
+
+async def vk_booru_search(booru, parameters: str, uploader) -> list[str] | str:
+    splitted_parameters = parameters.split()
+    try:
+        posts_count = int(splitted_parameters[0])
+        query = ' '.join(splitted_parameters[1:])
+    except ValueError:
+        posts_count = 3
+        query = parameters
+
+    if post_count >= 6:
+        return "5 posts max"
+
+    block_query = await get_block_query(message.from_id)
+    posts = await booru.search(query, block_query, posts_count)
+    post = random.choice(posts)
+    post_url = post['large_file_url']
+    image_bytes = await get_url_image(post_url)
+    photo = await uploader.upload(image_bytes, message.from_id)
+    return [photo]
 
 
 async def main():
