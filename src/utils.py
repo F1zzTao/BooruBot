@@ -3,9 +3,10 @@ import asyncio
 import aiohttp
 import booru
 import msgspec
-import random
+from vkbottle import PhotoMessageUploader
 
 from config import DEFAULT_BLOCK
+from db import get_block_query
 
 
 class DanbooruSearcher:
@@ -15,7 +16,19 @@ class DanbooruSearcher:
 
     async def search(self, query: str, block: str = '', limit: int = 100) -> list[dict]:
         res = await self.dan.search(
-            query=query, block=(DEFAULT_BLOCK+block).strip(), limit=limit, random=False
+            query=query, block=(DEFAULT_BLOCK+block).strip(), limit=limit
+        )
+        return self.decoder.decode(res)
+
+
+class SafeBooruSearcher:
+    def __init__(self):
+        self.dan = booru.Safebooru()
+        self.decoder = msgspec.json.Decoder()
+
+    async def search(self, query: str, block: str = '', limit: int = 100) -> list[dict]:
+        res = await self.dan.search(
+            query=query, block=(DEFAULT_BLOCK+block).strip(), limit=limit
         )
         return self.decoder.decode(res)
 
@@ -26,7 +39,9 @@ async def get_url_image(url: str) -> bytes:
             return await resp.read()
 
 
-async def vk_booru_search(booru, parameters: str, uploader) -> list[str] | str:
+async def vk_booru_search(
+    booru: DanbooruSearcher, from_id: int, parameters: str, uploader: PhotoMessageUploader
+) -> list[str] | str:
     splitted_parameters = parameters.split()
     try:
         posts_count = int(splitted_parameters[0])
@@ -35,16 +50,21 @@ async def vk_booru_search(booru, parameters: str, uploader) -> list[str] | str:
         posts_count = 3
         query = parameters
 
-    if post_count >= 6:
+    if posts_count > 5:
         return "5 posts max"
 
-    block_query = await get_block_query(message.from_id)
-    posts = await booru.search(query, block_query, posts_count)
-    post = random.choice(posts)
-    post_url = post['large_file_url']
-    image_bytes = await get_url_image(post_url)
-    photo = await uploader.upload(image_bytes, message.from_id)
-    return [photo]
+    block_query = await get_block_query(from_id)
+    posts_all = await booru.search(query, block_query, 100)
+    posts = posts_all[:posts_count]
+
+    photos = []
+    for post in posts:
+        post_url = post.get('large_file_url') or post.get('sample_url') or post.get('file_url')
+        image_bytes = await get_url_image(post_url)
+        photo = await uploader.upload(image_bytes, peer_id=from_id)
+        photos.append(photo)
+
+    return photos
 
 
 async def main():
