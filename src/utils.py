@@ -35,6 +35,18 @@ class SafeBooruSearcher:
         return self.decoder.decode(res)
 
 
+class Rule34Searcher:
+    def __init__(self):
+        self.dan = booru.Rule34()
+        self.decoder = msgspec.json.Decoder()
+
+    async def search(self, query: str, block: str = '', limit: int = 100) -> list[dict]:
+        res = await self.dan.search(
+            query=query, block=(DEFAULT_BLOCK+block).strip(), limit=limit
+        )
+        return self.decoder.decode(res)
+
+
 async def get_url_image(url: str) -> bytes:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
@@ -56,7 +68,10 @@ async def vk_booru_search(
         return "8 posts max"
 
     block_query = await get_block_query(from_id)
-    posts_all = await booru.search(query, block_query, 100)
+    try:
+        posts_all = await booru.search(query, block_query, 100)
+    except Exception:
+        return "no photos"
     posts = posts_all[:posts_count]
 
     photos = []

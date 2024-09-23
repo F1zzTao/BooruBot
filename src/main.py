@@ -6,6 +6,7 @@ from db import create_db, get_block_query, set_block_query
 from utils import (
     DanbooruSearcher,
     SafeBooruSearcher,
+    Rule34Searcher,
     bad_words_in_text,
     vk_booru_search
 )
@@ -36,7 +37,7 @@ async def remove_block_handler(message: Message):
     return "done, removed your blocks"
 
 
-@bot.on.message(text='!dan <parameters>')
+@bot.on.message(text=('!dan <parameters>', '!danbooru <parameters>'))
 async def danbooru_handler(message: Message, parameters: str):
     msg_id = (await message.answer("ща сек")).conversation_message_id
     result = await vk_booru_search(DanbooruSearcher(), message.from_id, parameters, upl)
@@ -54,10 +55,28 @@ async def danbooru_handler(message: Message, parameters: str):
     )
 
 
-@bot.on.message(text='!sfwbooru <parameters>')
+@bot.on.message(text=('!sfwbooru <parameters>', '!safebooru <parameters>'))
 async def safe_booru_handler(message: Message, parameters: str):
     msg_id = (await message.answer("ща сек")).conversation_message_id
     result = await vk_booru_search(SafeBooruSearcher(), message.from_id, parameters, upl)
+    if isinstance(result, str):
+        await bot.api.messages.edit(
+            peer_id=message.peer_id,
+            message=result,
+            conversation_message_id=msg_id
+        )
+
+    await bot.api.messages.edit(
+        peer_id=message.peer_id,
+        attachment=','.join(result),
+        conversation_message_id=msg_id
+    )
+
+
+@bot.on.message(text=('!r34 <parameters>', '!rule34 <parameters>'))
+async def rule34_handler(message: Message, parameters: str):
+    msg_id = (await message.answer("ща сек")).conversation_message_id
+    result = await vk_booru_search(Rule34Searcher(), message.from_id, parameters, upl)
     if isinstance(result, str):
         await bot.api.messages.edit(
             peer_id=message.peer_id,
